@@ -1,0 +1,25 @@
+<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <!-- Green background -->
+  <rect width="400" height="400" fill="#6BBF59"/>
+  
+  <!-- Brain icon (stylized) -->
+  <g transform="translate(200, 120)">
+    <!-- Left hemisphere -->
+    <path d="M -40 0 Q -50 -20 -45 -40 Q -35 -55 -20 -60 Q -5 -55 0 -40 L 0 20 Q -20 20 -40 0" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Wrinkles on left -->
+    <path d="M -35 -15 Q -30 -20 -25 -15" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    <path d="M -30 -8 Q -22 -12 -15 -8" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    <path d="M -35 -35 Q -28 -32 -22 -35" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    
+    <!-- Right hemisphere -->
+    <path d="M 40 0 Q 50 -20 45 -40 Q 35 -55 20 -60 Q 5 -55 0 -40 L 0 20 Q 20 20 40 0" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Wrinkles on right -->
+    <path d="M 35 -15 Q 30 -20 25 -15" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    <path d="M 30 -8 Q 22 -12 15 -8" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    <path d="M 35 -35 Q 28 -32 22 -35" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  
+  <!-- Text -->
+  <text x="200" y="320" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="white" text-anchor="middle">HITAM</text>
+  <text x="200" y="350" font-family="Arial, sans-serif" font-size="20" fill="white" text-anchor="middle">find your path</text>
+</svg>

@@ -11,12 +11,13 @@ const Navbar = ({ onToggleSidebar }) => {
         </button>
         
         <div className="logo">
-          <img src="https://tse4.mm.bing.net/th/id/OIP.OQ6ucQ9Mfhg3t1WngxT2UgHaEM?pid=Api&P=0&h=180" alt="Logo" className="logo-img" />
+          <img src="/hitam-logo.svg" alt="HITAM Logo" className="logo-img" />
         </div>
       </div>
       
       <div className="navbar-center">
-        <h1 className="navbar-title">IOT Dashboard</h1>
+        <h1 className="navbar-title">HITAM IoT Water Monitoring System</h1>
+        <p className="navbar-subtitle">find your path</p>
       </div>
       
       {/* <div className="navbar-right">
