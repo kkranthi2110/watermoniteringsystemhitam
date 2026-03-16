@@ -10,6 +10,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
+from tensorflow.keras.models import load_model
+import numpy as np
 
 # Load environment variables from .env file
 load_dotenv()
@@ -24,6 +26,11 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
+
+# ==============================
+# LOAD ML MODEL
+# ==============================
+ml_model = load_model("saved_models/LSTM_model_v2.h5")
 
 # ==============================
 # DATABASE CONNECTION
@@ -74,6 +81,19 @@ def create_tables():
         tank_width_cm FLOAT,
         lat FLOAT,
         long FLOAT
+    )
+    """)
+
+    # Predictions history table
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS predictions (
+        id SERIAL PRIMARY KEY,
+        node_id VARCHAR(50),
+        distance FLOAT,
+        temperature FLOAT,
+        prediction VARCHAR(50),
+        confidence FLOAT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
@@ -183,6 +203,12 @@ class TankParameters(BaseModel):
     tank_width_cm: float
     lat: float
     long: float
+
+class PredictionRequest(BaseModel):
+
+    distance: float
+    temperature: float
+    time_features: list[float]
 
 
 # ==============================
@@ -324,6 +350,99 @@ def get_sensor_data(node_id: str = None):
         })
 
     return result
+
+
+# ==============================
+# PREDICTION API
+# ==============================
+@app.post("/api/v1/predict")
+async def predict_water_activity(data: PredictionRequest):
+    """
+    Predict water activity based on sensor data
+    Input: {"distance": float, "temperature": float, "time_features": list}
+    Output: {"prediction": string, "confidence": float}
+    """
+    # Preprocess input data
+    input_data = np.array([[data.distance, data.temperature] + data.time_features])
+    
+    # Run model prediction
+    predictions = ml_model.predict(input_data)
+    predicted_class = np.argmax(predictions[0])
+    confidence = float(predictions[0][predicted_class])
+    
+    classes = ["no_activity", "shower", "faucet", "toilet", "dishwasher"]
+    prediction_label = classes[predicted_class]
+    
+    # Store prediction in database
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+    INSERT INTO predictions (node_id, distance, temperature, prediction, confidence)
+    VALUES (%s, %s, %s, %s, %s)
+    """, ("NODE_001", data.distance, data.temperature, prediction_label, confidence))
+    conn.commit()
+    cur.close()
+    conn.close()
+    
+    return {
+        "prediction": prediction_label,
+        "confidence": confidence
+    }
+
+
+# ==============================
+# MODEL INFO API
+# ==============================
+@app.get("/api/v1/model-info")
+async def get_model_info():
+    """
+    Return information about the deployed ML model
+    """
+    return {
+        "model_type": "LSTM",
+        "version": "2.0",
+        "accuracy": 0.87,  # Updated with enhanced model accuracy
+        "last_trained": "2026-03-16",
+        "classes": ["no_activity", "shower", "faucet", "toilet", "dishwasher"]
+    }
+
+
+# ==============================
+# PREDICTIONS HISTORY API
+# ==============================
+@app.get("/api/v1/predictions-history")
+async def get_predictions_history(limit: int = 100):
+    """
+    Get historical predictions with timestamps
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+    SELECT id, node_id, distance, temperature, prediction, confidence, created_at
+    FROM predictions
+    ORDER BY created_at DESC
+    LIMIT %s
+    """, (limit,))
+    
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    result = []
+    for row in rows:
+        result.append({
+            "id": row[0],
+            "node_id": row[1],
+            "distance": row[2],
+            "temperature": row[3],
+            "prediction": row[4],
+            "confidence": row[5],
+            "created_at": row[6]
+        })
+    
+    return result
+
 
 # ==============================
 # START BACKGROUND COLLECTOR
