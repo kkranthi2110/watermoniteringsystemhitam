@@ -4,4 +4,5 @@ fastapi
 uvicorn
 pydantic
 python-dotenv
-tensorflow
+numpy==1.23.5
+tensorflow==2.13.0
