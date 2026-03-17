@@ -4,7 +4,7 @@
 // Use environment variable for production, fallback to localhost for development
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "https://your-backend-url.onrender.com";
 
-export default {
+const config = {
   API_BASE_URL,
   SENSOR_DATA_URL: `${API_BASE_URL}/sensor-data`,
   TANK_PARAMETERS_URL: `${API_BASE_URL}/tank-parameters`,
@@ -12,3 +12,5 @@ export default {
   MODEL_INFO_URL: `${API_BASE_URL}/api/v1/model-info`,
   PREDICTIONS_HISTORY_URL: `${API_BASE_URL}/api/v1/predictions-history`,
 };
+
+export default config;
