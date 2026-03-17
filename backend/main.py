@@ -10,7 +10,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
-import numpy as np
 
 # Load environment variables from .env file
 load_dotenv()
@@ -25,23 +24,6 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
-
-# ==============================
-# LAZY LOAD ML MODEL
-# ==============================
-ml_model = None
-
-def get_model():
-    """Lazy load the ML model only when needed"""
-    global ml_model
-    if ml_model is None:
-        try:
-            from tensorflow.keras.models import load_model
-            ml_model = load_model("saved_models/LSTM_model_v2.h5")
-        except Exception as e:
-            print(f"Warning: Could not load ML model: {e}")
-            ml_model = None
-    return ml_model
 
 # ==============================
 # DATABASE CONNECTION
@@ -370,47 +352,20 @@ def get_sensor_data(node_id: str = None):
 async def predict_water_activity(data: PredictionRequest):
     """
     Predict water activity based on sensor data
-    Input: {"distance": float, "temperature": float, "time_features": list}
-    Output: {"prediction": string, "confidence": float}
+    Returns mock predictions for free tier deployment
     """
-    model = get_model()
-    
-    # If model not available, return mock prediction
-    if model is None:
-        classes = ["no_activity", "shower", "faucet", "toilet", "dishwasher"]
-        prediction_label = random.choice(classes)
-        confidence = round(random.uniform(0.7, 0.95), 3)
-        
-        # Store prediction in database
-        try:
-            conn = get_connection()
-            cur = conn.cursor()
-            cur.execute("""
-            INSERT INTO predictions (node_id, distance, temperature, prediction, confidence)
-            VALUES (%s, %s, %s, %s, %s)
-            """, ("NODE_001", data.distance, data.temperature, prediction_label, confidence))
-            conn.commit()
-            cur.close()
-            conn.close()
-        except:
-            pass
-        
-        return {
-            "prediction": prediction_label,
-            "confidence": confidence,
-            "note": "Mock prediction - model not loaded"
-        }
-    
-    # Preprocess input data
-    input_data = np.array([[data.distance, data.temperature] + data.time_features])
-    
-    # Run model prediction
-    predictions = model.predict(input_data)
-    predicted_class = np.argmax(predictions[0])
-    confidence = float(predictions[0][predicted_class])
-    
     classes = ["no_activity", "shower", "faucet", "toilet", "dishwasher"]
-    prediction_label = classes[predicted_class]
+    
+    # Mock prediction based on sensor values
+    if data.distance < 30:
+        prediction_label = "no_activity"
+        confidence = 0.92
+    elif data.distance < 50:
+        prediction_label = random.choice(["shower", "faucet"])
+        confidence = round(random.uniform(0.75, 0.95), 3)
+    else:
+        prediction_label = random.choice(["toilet", "dishwasher"])
+        confidence = round(random.uniform(0.70, 0.90), 3)
     
     # Store prediction in database
     try:
@@ -423,12 +378,13 @@ async def predict_water_activity(data: PredictionRequest):
         conn.commit()
         cur.close()
         conn.close()
-    except:
-        pass
+    except Exception as e:
+        print(f"Error storing prediction: {e}")
     
     return {
         "prediction": prediction_label,
-        "confidence": confidence
+        "confidence": confidence,
+        "note": "Mock prediction - deployed on free Render tier"
     }
 
 
