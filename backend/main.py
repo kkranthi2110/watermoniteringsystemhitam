@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
+import numpy as np
 
 # Load environment variables from .env file
 load_dotenv()
@@ -275,36 +276,6 @@ def get_tank_parameters():
 # ==============================
 # GET SENSOR DATA API
 # ==============================
-@app.get("/sensor-data")
-def get_sensor_data():
-
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute("""
-    SELECT id,node_id,field1,field2,created_at
-    FROM sensor_data
-    ORDER BY id DESC
-    LIMIT 100
-    """)
-
-    rows = cur.fetchall()
-
-    cur.close()
-    conn.close()
-
-    result = []
-
-    for row in rows:
-        result.append({
-            "id": row[0],
-            "node_id": row[1],
-            "distance": row[2],
-            "temperature": row[3],
-            "created_at": row[4]
-        })
-
-    return result
 
 @app.get("/sensor-data")
 def get_sensor_data(node_id: str = None):
@@ -346,26 +317,87 @@ def get_sensor_data(node_id: str = None):
 
 
 # ==============================
+# ML MODEL LOADING
+# ==============================
+ml_model = None
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "saved_models", "best_model.h5")
+
+def load_ml_model():
+    """Attempt to load the ML model. Falls back to mock predictions if unavailable."""
+    global ml_model
+    try:
+        from tensorflow.keras.models import load_model
+        if os.path.exists(MODEL_PATH):
+            ml_model = load_model(MODEL_PATH)
+            print(f"ML model loaded successfully from {MODEL_PATH}")
+        else:
+            print(f"Model file not found at {MODEL_PATH}. Using mock predictions.")
+    except ImportError:
+        print("TensorFlow not available. Using mock predictions.")
+    except Exception as e:
+        print(f"Error loading model: {e}. Using mock predictions.")
+
+
+def mock_predict(distance, temperature):
+    """Mock prediction based on sensor value ranges when ML model is unavailable."""
+    classes = ["filling", "flush", "geyser", "no_activity", "washing_machine"]
+    
+    if distance < 30:
+        prediction_label = "no_activity"
+        confidence = 0.92
+    elif distance < 50:
+        prediction_label = random.choice(["shower", "faucet"])
+        confidence = round(random.uniform(0.75, 0.95), 3)
+    elif distance < 80:
+        prediction_label = random.choice(["toilet", "dishwasher"])
+        confidence = round(random.uniform(0.70, 0.90), 3)
+    else:
+        prediction_label = "no_activity"
+        confidence = round(random.uniform(0.80, 0.95), 3)
+    
+    return prediction_label, confidence
+
+
+def ml_predict(distance, temperature, time_features):
+    """Run actual ML model prediction."""
+    try:
+        # Prepare input features (adjust shape based on your model's expected input)
+        features = [distance, temperature] + time_features
+        input_data = np.array(features).reshape(1, len(features), 1)
+        
+        prediction = ml_model.predict(input_data, verbose=0)
+        classes = ["filling", "flush", "geyser", "no_activity", "washing_machine"]
+        
+        predicted_index = int(np.argmax(prediction[0]))
+        confidence = float(np.max(prediction[0]))
+        prediction_label = classes[predicted_index]
+        
+        return prediction_label, round(confidence, 3)
+    except Exception as e:
+        print(f"ML prediction failed: {e}. Falling back to mock.")
+        return mock_predict(distance, temperature)
+
+
+# ==============================
 # PREDICTION API
 # ==============================
 @app.post("/api/v1/predict")
 async def predict_water_activity(data: PredictionRequest):
     """
-    Predict water activity based on sensor data
-    Returns mock predictions for free tier deployment
+    Predict water activity based on sensor data.
+    Uses ML model if available, otherwise falls back to mock predictions.
+    Input: {"distance": float, "temperature": float, "time_features": list}
+    Output: {"prediction": string, "confidence": float}
     """
-    classes = ["no_activity", "shower", "faucet", "toilet", "dishwasher"]
-    
-    # Mock prediction based on sensor values
-    if data.distance < 30:
-        prediction_label = "no_activity"
-        confidence = 0.92
-    elif data.distance < 50:
-        prediction_label = random.choice(["shower", "faucet"])
-        confidence = round(random.uniform(0.75, 0.95), 3)
+    # Use ML model if loaded, otherwise mock
+    if ml_model is not None:
+        prediction_label, confidence = ml_predict(
+            data.distance, data.temperature, data.time_features
+        )
+        prediction_source = "ml_model"
     else:
-        prediction_label = random.choice(["toilet", "dishwasher"])
-        confidence = round(random.uniform(0.70, 0.90), 3)
+        prediction_label, confidence = mock_predict(data.distance, data.temperature)
+        prediction_source = "mock"
     
     # Store prediction in database
     try:
@@ -384,7 +416,7 @@ async def predict_water_activity(data: PredictionRequest):
     return {
         "prediction": prediction_label,
         "confidence": confidence,
-        "note": "Mock prediction - deployed on free Render tier"
+        "source": prediction_source
     }
 
 
@@ -449,6 +481,7 @@ async def get_predictions_history(limit: int = 100):
 def start_background_tasks():
 
     create_tables()
+    load_ml_model()  # Attempt to load ML model at startup
 
     thread = threading.Thread(target=sensor_collector)
     thread.daemon = True
