@@ -185,15 +185,15 @@ best_model.save(SAVE_DIR / "best_model.h5")
 print(f"Saved best model to {SAVE_DIR / 'best_model.h5'}")
 
 # Also save classes and label encoder details for backend
-with open(BASE_DIR / "model_info.txt", "w") as f:
+with open(BASE_DIR / "model_info.txt", "w", encoding="utf-8") as f:
     f.write(f"Classes: {list(le.classes_)}\n")
     f.write(f"Accuracy: {best_model_info['Accuracy']}\n")
     f.write(f"F1: {best_model_info['F1']}\n")
 
 # Generate Markdown Log
 log_path = BASE_DIR / "training_log.md"
-with open(log_path, "w") as f:
-    f.write("# 📊 ML Model Training Log\n\n")
+with open(log_path, "w", encoding="utf-8") as f:
+    f.write("# ML Model Training Log\n\n")
     f.write("| Experiment | Model | Layers | Units | Dropout | Learning Rate | Epochs | Accuracy | F1 Score | Notes |\n")
     f.write("|------------|-------|--------|-------|---------|---------------|--------|----------|----------|-------|\n")
     for e in experiments:
