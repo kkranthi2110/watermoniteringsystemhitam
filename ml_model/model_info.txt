@@ -1,3 +1,5 @@
 Classes: [np.str_('filling'), np.str_('flush'), np.str_('geyser'), np.str_('no_activity'), np.str_('washing_machine')]
-Accuracy: 84.13%
-F1: 0.629
+Best Model: Experiment 4 (GRU)
+Accuracy: 92.66%
+F1: 0.884
+Notes: Enhanced GRU + BatchNorm

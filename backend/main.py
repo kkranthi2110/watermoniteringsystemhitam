@@ -429,9 +429,9 @@ async def get_model_info():
     Return information about the deployed ML model
     """
     return {
-        "model_type": "LSTM",
-        "version": "2.0",
-        "accuracy": 0.8413,  # Updated with enhanced model accuracy
+        "model_type": "GRU",
+        "version": "3.0",
+        "accuracy": 0.9266,  # Updated with enhanced model accuracy
         "last_trained": "2026-03-18",
         "classes": ["filling", "flush", "geyser", "no_activity", "washing_machine"]
     }
