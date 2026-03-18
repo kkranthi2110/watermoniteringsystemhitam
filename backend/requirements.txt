@@ -6,3 +6,4 @@ python-dotenv
 requests
 tensorflow-cpu
 numpy
+python-multipart
