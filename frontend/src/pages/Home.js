@@ -37,8 +37,55 @@ const Home = () => {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000); // Auto-refresh every 30s
-    return () => clearInterval(interval);
+    // Replaced auto-refresh interval with WebSocket for truly real-time
+    // const interval = setInterval(fetchData, 30000); 
+    // return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    // Setup WebSocket connection
+    const wsUrl = config.API_BASE_URL.replace(/^http/, 'ws') + '/ws/sensor-data';
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => console.log('WebSocket Connected to Real-time Stream');
+
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === 'new_sensor_data') {
+          // Append new sensor data
+          setSensorData(prevData => {
+            const newData = [...prevData, {
+              id: Date.now(), // dummy id
+              node_id: "NODE_001",
+              distance: payload.distance,
+              temperature: payload.temperature,
+              created_at: payload.created_at
+            }];
+            return newData; // keep full array to avoid bounding issues, or slice it if it gets too large
+          });
+
+          // Prepend new prediction history
+          setPredictionHistory(prevHistory => {
+            const newPred = {
+              created_at: payload.created_at,
+              confidence: payload.confidence,
+              prediction: payload.prediction,
+              distance: payload.distance,
+            };
+            return [newPred, ...prevHistory];
+          });
+          
+          setLastUpdate(new Date().toLocaleTimeString());
+        }
+      } catch (err) {
+        console.error('Error parsing WS message:', err);
+      }
+    };
+
+    return () => {
+      ws.close();
+    };
   }, []);
 
   // Compute stats
@@ -349,7 +396,7 @@ const Home = () => {
           Recent Sensor Readings
           <span className="realtime-badge">
             <span className="realtime-dot"></span>
-            Auto-refresh 30s
+            Live WebSocket
           </span>
         </h3>
         <div className="nodes-table-container">

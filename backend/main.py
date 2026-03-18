@@ -6,12 +6,13 @@ import time
 import random
 import threading
 from datetime import datetime
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 import numpy as np
+import asyncio
 import csv
 import io
 
@@ -132,61 +133,113 @@ def generate_test_data():
 
 
 # ==============================
+# EMAIL ALERTS
+# ==============================
+def send_anomaly_email(distance, temperature):
+    """
+    Sends an email alert when an anomaly is detected (e.g., highly unusual distance or temp).
+    """
+    sender_email = os.environ.get("SMTP_EMAIL", "system@hitamiot.com")
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@hitamiot.com")
+    
+    print(f"⚠️ ANOMALY DETECTED: Dist {distance}cm, Temp {temperature}°C")
+    print(f"📧 Sending Mock Email Alert to {admin_email} from {sender_email}...")
+    print(f"    Subject: CRITICAL: Water System Anomaly Detected")
+    print(f"    Body: Immediate attention required. Abnormal sensor readings logged.")
+
+# ==============================
+# WEBSOCKET MANAGER
+# ==============================
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: dict):
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except:
+                pass
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/sensor-data")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+
+# ==============================
 # SENSOR DATA COLLECTOR
 # ==============================
-def sensor_collector():
+async def sensor_collector_async():
 
-    global last_created_at
-
-    print("Distance & Temperature Data Collector Started")
+    print("Distance & Temperature Async Data Collector Started")
 
     while True:
-
         try:
-
             if TEST_MODE:
-
                 test_data = generate_test_data()
-
                 distance = test_data["distance"]
                 temperature = test_data["temperature"]
                 created_at = test_data["created_at"]
-
             else:
-
                 response = requests.get(url)
                 data = response.json()
-
                 feed = data["feeds"][0]
-
                 distance = float(feed["field1"])
                 temperature = float(feed["field2"])
                 created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             print("NEW DATA:", distance, temperature, created_at)
 
+            # Check for anomalies to send email
+            if distance > 100 or temperature > 35 or temperature < 5:
+                send_anomaly_email(distance, temperature)
+
+            # Insert into DB
             conn = get_connection()
             cur = conn.cursor()
-
             cur.execute("""
             INSERT INTO sensor_data
             (node_id, field1, field2, created_at)
             VALUES (%s,%s,%s,%s)
-            """,
-                        (NODE_ID, distance, temperature, created_at))
-
+            """, (NODE_ID, distance, temperature, created_at))
             conn.commit()
-
             cur.close()
             conn.close()
 
-            print("Sensor data inserted")
+            # Predict current activity for websocket broadcast
+            if ml_model is not None:
+                pred_label, conf = ml_predict(distance, temperature, [0.0]*5)
+            else:
+                pred_label, conf = mock_predict(distance, temperature)
 
+            # Broadcast new data
+            await manager.broadcast({
+                "type": "new_sensor_data",
+                "distance": distance,
+                "temperature": temperature,
+                "prediction": pred_label,
+                "confidence": conf,
+                "created_at": created_at
+            })
+
+            print("Sensor data inserted and broadcasted")
         except Exception as e:
+            print("Collector Error:", e)
 
-            print("Error:", e)
-
-        time.sleep(20)
+        await asyncio.sleep(20)
 
 
 # ==============================
@@ -423,6 +476,30 @@ async def predict_water_activity(data: PredictionRequest):
     }
 
 
+class AuthRequest(BaseModel):
+    username: str
+    password: str
+
+# In a real app, use hashed passwords and a 'users' table.
+MOCK_USERS = {
+    "admin": "admin123",
+    "testuser": "password"
+}
+
+@app.post("/api/v1/auth/register")
+async def register(data: AuthRequest):
+    if data.username in MOCK_USERS:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    MOCK_USERS[data.username] = data.password
+    return {"message": "User registered successfully"}
+
+@app.post("/api/v1/auth/login")
+async def login(data: AuthRequest):
+    if data.username not in MOCK_USERS or MOCK_USERS[data.username] != data.password:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    # Return a mock JWT token
+    return {"access_token": f"mock_jwt_token_for_{data.username}", "token_type": "bearer"}
+
 # ==============================
 # MODEL INFO API
 # ==============================
@@ -533,14 +610,12 @@ async def batch_predict_csv(file: UploadFile = File(...)):
 # START BACKGROUND COLLECTOR
 # ==============================
 @app.on_event("startup")
-def start_background_tasks():
+async def start_background_tasks():
 
     create_tables()
     load_ml_model()  # Attempt to load ML model at startup
 
-    thread = threading.Thread(target=sensor_collector)
-    thread.daemon = True
-    thread.start()
+    asyncio.create_task(sensor_collector_async())
 
 
 # ==============================
