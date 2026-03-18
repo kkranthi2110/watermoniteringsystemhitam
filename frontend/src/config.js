@@ -2,7 +2,7 @@
 // Central config for API URLs and other constants
 
 // Use environment variable for production, fallback to localhost for development
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "https://your-backend-url.onrender.com";
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8000";
 
 const config = {
   API_BASE_URL,

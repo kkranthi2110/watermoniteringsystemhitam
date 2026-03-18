@@ -6,8 +6,8 @@ venv/
 # Environment files (contain secrets)
 .env
 .env.local
-.env.production
 !.env.example
+!.env.production
 
 # Python
 __pycache__/
