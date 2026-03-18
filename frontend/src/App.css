@@ -70,6 +70,26 @@
 }
 
 /* ============================================
+   DARK MODE
+   ============================================ */
+.dark-mode {
+  --bg-primary: #121212;
+  --bg-secondary: #1e1e1e;
+  --bg-card: #1e1e1e;
+  --bg-dark: #0a120a;
+  --text-primary: #e0e0e0;
+  --text-secondary: #b0b0b0;
+  --text-muted: #888888;
+  --border-color: #333333;
+  --border-light: #2c2c2c;
+  --primary-bg: rgba(76, 175, 80, 0.15);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.7);
+  --shadow-xl: 0 12px 40px rgba(0, 0, 0, 0.8);
+}
+
+/* ============================================
    GLOBAL RESET & BASE
    ============================================ */
 *,
@@ -162,6 +182,23 @@ body {
 
 .hamburger-btn:hover {
   background: rgba(255, 255, 255, 0.15);
+}
+
+.theme-toggle-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 20px;
+  font-size: 1.2rem;
+  transition: background var(--transition-fast);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.theme-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .hamburger-line {
@@ -798,6 +835,44 @@ body {
 
 .prediction-results-section h2 {
   font-size: 1.15rem;
+
+/* ============================================
+   MOBILE RESPONSIVENESS
+   ============================================ */
+@media (max-width: 768px) {
+  .main-content {
+    margin-top: calc(var(--nav-height) + 10px);
+    padding: 16px;
+  }
+  .navbar-title {
+    font-size: 1rem;
+  }
+  .navbar-subtitle {
+    display: none;
+  }
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .navbar {
+    padding: 0 12px;
+  }
+  .logo-img {
+    height: 32px;
+    width: 32px;
+  }
+}
   font-weight: 700;
   margin-bottom: 20px;
 }

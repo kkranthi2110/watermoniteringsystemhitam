@@ -6,11 +6,14 @@ import time
 import random
 import threading
 from datetime import datetime
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 import numpy as np
+import csv
+import io
 
 # Load environment variables from .env file
 load_dotenv()
@@ -472,6 +475,58 @@ async def get_predictions_history(limit: int = 100):
         })
     
     return result
+
+
+# ==============================
+# BATCH PREDICTION API (CSV)
+# ==============================
+@app.post("/api/v1/predict/batch")
+async def batch_predict_csv(file: UploadFile = File(...)):
+    """
+    Accepts a CSV file with columns: distance, temperature, time_features...
+    Returns a JSON list of predictions.
+    """
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="Only CSV files are allowed.")
+    
+    content = await file.read()
+    try:
+        decoded = content.decode('utf-8')
+    except Exception:
+        raise HTTPException(status_code=400, detail="Error decoding file string.")
+    
+    csv_reader = csv.DictReader(io.StringIO(decoded))
+    results = []
+    
+    for row in csv_reader:
+        try:
+            distance = float(row.get('distance', 0))
+            temperature = float(row.get('temperature', 0))
+            # Extract time features if they exist (assuming column names like time_0, time_1)
+            time_features = []
+            for k in row.keys():
+                if k.startswith('time_'):
+                    time_features.append(float(row[k]))
+            
+            if len(time_features) == 0:
+                time_features = [0.0] * 5 # dummy time features if none provided
+                
+            if ml_model is not None:
+                pred_label, conf = ml_predict(distance, temperature, time_features)
+            else:
+                pred_label, conf = mock_predict(distance, temperature)
+                
+            results.append({
+                "distance": distance,
+                "temperature": temperature,
+                "prediction": pred_label,
+                "confidence": conf
+            })
+        except Exception as e:
+            # Skip malformed rows
+            continue
+            
+    return {"status": "success", "total_processed": len(results), "results": results}
 
 
 # ==============================
